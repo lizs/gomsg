@@ -54,18 +54,7 @@ func handleConn(s *Server, conn net.Conn) {
 	log.Printf("conn [%d] established.\n", s.seed)
 
 	//go echo(session)
-	go dispatch(session)
-}
-
-func dispatch(s *Session) {
-	input := bufio.NewScanner(s.Conn)
-	input.Split(s.Scan)
-
-	for input.Scan() {
-		log.Printf("conn : %d=> [%d] bytes\n", s.ID, len(input.Bytes()))
-	}
-
-	log.Printf("conn [%d] closed.\n", s.ID)
+	go session.scan()
 }
 
 func echo(s *Session) {
