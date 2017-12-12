@@ -20,6 +20,6 @@ func (h *handler) OnPush(s *gomsg.Session, data []byte) uint16 {
 }
 
 func main() {
-	s := gomsg.NewServer("localhost:6000", &handler{})
+	s := gomsg.NewServer(":6000", &handler{})
 	s.Start()
 }

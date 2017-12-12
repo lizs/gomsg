@@ -22,11 +22,14 @@ type Result struct {
 
 // Session 会话
 type Session struct {
-	ID      int32
-	conn    net.Conn
-	handler ISessionHandler
-	bodyLen uint16
-	err     error
+	ID       int32
+	conn     net.Conn
+	handler  ISessionHandler
+	bodyLen  uint16
+	err      error
+	reqSeed  uint16
+	ppSeed   uint8
+	requests map[uint16]chan *Result
 }
 
 // SetHandler 设置会话处理器
@@ -78,16 +81,17 @@ func (s *Session) scan() {
 		s.dispatch(input.Bytes())
 	}
 
-	log.Printf("conn [%d] closed.\n", s.ID)
+	s.Close()
 }
 
 // Close 关闭会话
 func (s *Session) Close() {
 	s.conn.Close()
+	log.Printf("conn [%d] closed.\n", s.ID)
 }
 
 func (s *Session) dispatch(data []byte) {
-	log.Printf("conn : %d=> Read [% x]\n", s.ID, data)
+	//log.Printf("conn : %d=> Read [% x]\n", s.ID, data)
 
 	if len(data) < 2 {
 		return
@@ -106,12 +110,15 @@ func (s *Session) dispatch(data []byte) {
 
 	switch pattern {
 	case Push:
+		s.onPush(reader, left)
 	case Request:
 		s.onReq(reader, left)
 	case Response:
+		s.onResponse(reader, left)
 	case Ping:
 		s.onPing(reader)
 	case Pong:
+		s.onPong(reader)
 	case Sub:
 	case Unsub:
 	case Pub:
@@ -127,6 +134,72 @@ func (s *Session) onPing(reader *bytes.Buffer) {
 	}
 
 	s.pong(serial)
+}
+
+// todo lizs
+func (s *Session) onPong(reader *bytes.Buffer) {
+}
+
+func (s *Session) onPush(reader *bytes.Buffer, left int) {
+	body := make([]byte, left)
+	n, err := reader.Read(body)
+	if n != left || err != nil {
+		s.Close()
+		log.Println("")
+		return
+	}
+
+	if s.handler == nil {
+		return
+	}
+
+	ret := s.handler.OnPush(s, body)
+	if ret != 0 {
+		log.Printf("onPush : %d\n", ret)
+	}
+}
+
+func (s *Session) onResponse(reader *bytes.Buffer, left int) {
+	var serial uint16
+	var en uint16
+	err := binary.Read(reader, binary.LittleEndian, &serial)
+	if err != nil {
+		s.Close()
+		log.Println(err.Error())
+		return
+	}
+
+	left -= 2
+	err = binary.Read(reader, binary.LittleEndian, &en)
+	if err != nil {
+		s.Close()
+		log.Println(err.Error())
+		return
+	}
+
+	left -= 2
+	body := make([]byte, left)
+	n, err := reader.Read(body)
+	if n != left {
+		s.Close()
+		log.Println("")
+		return
+	}
+
+	if err != nil {
+		s.Close()
+		log.Println(err.Error())
+		return
+	}
+
+	var req chan *Result
+	var exists bool
+	if req, exists = s.requests[serial]; !exists {
+		log.Printf("%d not exist in request.\n", serial)
+		return
+	}
+
+	req <- &Result{En: en, Data: body}
 }
 
 func (s *Session) onReq(reader *bytes.Buffer, left int) {
@@ -172,20 +245,87 @@ func (s *Session) Write(data []byte) {
 	log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
 }
 
-func (s *Session) Request(data []byte) {
+// Request request remote to response
+func (s *Session) Request(data []byte) *Result {
+	if len(data) == 0 {
+		return &Result{En: RequestDataIsEmpty}
+	}
 
+	s.reqSeed++
+	if _, exists := s.requests[s.reqSeed]; exists {
+		return &Result{En: SerialConflict}
+	}
+
+	req := make(chan *Result)
+	defer close(req)
+
+	// record, let 'response' package know which chan to notify
+	s.requests[s.reqSeed] = req
+
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(1+1+2+len(data)))
+	buf.WriteByte(1)
+	buf.WriteByte(Request)
+	binary.Write(buf, binary.LittleEndian, s.reqSeed)
+	if len(data) != 0 {
+		buf.Write(data)
+	}
+
+	ret := <-req
+	delete(s.requests, s.reqSeed)
+
+	return ret
 }
 
-func (s *Session) Push(data []byte) {
+// Push push to remote without response
+func (s *Session) Push(data []byte) uint16 {
+	if len(data) == 0 {
+		return PushDataIsEmpty
+	}
 
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(data)))
+	buf.WriteByte(1)
+	buf.WriteByte(Push)
+	if len(data) != 0 {
+		buf.Write(data)
+	}
+
+	s.Write(buf.Bytes())
+	return Success
 }
 
-func (s *Session) Pub(data []byte) {
+// Pub ...
+func (s *Session) Pub(subject string, data []byte) {
+	subBytes := []byte(subject)
 
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(subBytes)+1+len(data)))
+	buf.WriteByte(1)
+	buf.WriteByte(Pub)
+	buf.Write(subBytes)
+	buf.WriteByte(0) // append \0 to string
+	buf.Write(data)
+
+	s.Write(buf.Bytes())
 }
 
-func (s *Session) Sub(data []byte) {
+// Sub ...
+func (s *Session) Sub(subject string) {
+	subBytes := []byte(subject)
 
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(subBytes)))
+	buf.WriteByte(1)
+	buf.WriteByte(Sub)
+	buf.Write(subBytes)
+
+	s.Write(buf.Bytes())
+}
+
+// Ping ping remote, returns delay seconds
+func (s *Session) Ping() uint32 {
+	return 0
 }
 
 func (s *Session) pong(serial byte) {

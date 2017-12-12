@@ -10,6 +10,7 @@ const (
 	NoHandler
 	ReadErrorNo
 	SessionClosed
+	PushDataIsEmpty
 	End
 )
 
