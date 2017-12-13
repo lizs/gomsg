@@ -11,8 +11,8 @@ func (h *handler) OnOpen(s *gomsg.Session) {
 	s.SetHandler(h)
 }
 
-func (h *handler) OnReq(s *gomsg.Session, data []byte) *gomsg.Result {
-	return &gomsg.Result{En: gomsg.Success, Data: nil}
+func (h *handler) OnReq(s *gomsg.Session, data []byte, ch chan *gomsg.Result) {
+	ch <- &gomsg.Result{En: gomsg.Success, Data: nil}
 }
 
 func (h *handler) OnPush(s *gomsg.Session, data []byte) uint16 {

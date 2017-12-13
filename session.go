@@ -10,7 +10,7 @@ import (
 
 // ISessionHandler 会话处理器
 type ISessionHandler interface {
-	OnReq(s *Session, data []byte) *Result
+	OnReq(s *Session, data []byte, ch chan *Result)
 	OnPush(s *Session, data []byte) uint16
 }
 
@@ -67,9 +67,9 @@ func (s *Session) split(data []byte, atEOF bool) (advance int, token []byte, err
 		return 0, nil, nil
 	}
 
-	ad := int(s.bodyLen)
+	advance = int(s.bodyLen) + offset
 	s.bodyLen = 0
-	return offset + ad, data[offset : offset+ad], nil
+	return advance, data[offset:advance], nil
 }
 
 func (s *Session) scan() {
@@ -112,7 +112,7 @@ func (s *Session) dispatch(data []byte) {
 	case Push:
 		s.onPush(reader, left)
 	case Request:
-		s.onReq(reader, left)
+		go s.onReq(reader, left)
 	case Response:
 		s.onResponse(reader, left)
 	case Ping:
@@ -231,7 +231,11 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	ret := s.handler.OnReq(s, body)
+	ch := make(chan *Result, 1)
+	defer close(ch)
+	s.handler.OnReq(s, body, ch)
+	ret := <-ch
+
 	s.response(serial, ret)
 }
 
@@ -242,7 +246,7 @@ func (s *Session) Write(data []byte) {
 		log.Println("Write error")
 	}
 
-	log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
+	//log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
 }
 
 // Request request remote to response
