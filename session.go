@@ -22,14 +22,16 @@ type Result struct {
 
 // Session 会话
 type Session struct {
-	ID       int32
-	conn     net.Conn
-	handler  ISessionHandler
-	bodyLen  uint16
-	err      error
-	reqSeed  uint16
-	ppSeed   uint8
-	requests map[uint16]chan *Result
+	ID           int32
+	conn         net.Conn
+	handler      ISessionHandler
+	bodyLen      uint16
+	err          error
+	reqSeed      uint16
+	ppSeed       uint8
+	requests     map[uint16]chan *Result
+	readCounter  chan int
+	writeCounter chan int
 }
 
 // SetHandler 设置会话处理器
@@ -79,6 +81,7 @@ func (s *Session) scan() {
 	for input.Scan() {
 		// dispatch
 		s.dispatch(input.Bytes())
+		s.readCounter <- 1
 	}
 
 	s.Close()
@@ -244,6 +247,8 @@ func (s *Session) Write(data []byte) {
 	n, err := s.conn.Write(data)
 	if n != len(data) || err != nil {
 		log.Println("Write error")
+	} else {
+		s.writeCounter <- 1
 	}
 
 	//log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
