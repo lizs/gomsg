@@ -10,7 +10,7 @@ import (
 
 // ISessionHandler 会话处理器
 type ISessionHandler interface {
-	OnReq(s *Session, data []byte, ch chan *Result)
+	OnReq(s *Session, serial uint16, data []byte)
 	OnPush(s *Session, data []byte) uint16
 }
 
@@ -29,7 +29,7 @@ type Session struct {
 	err          error
 	reqSeed      uint16
 	ppSeed       uint8
-	requests     map[uint16]chan *Result
+	reqPool      map[uint16]chan *Result
 	readCounter  chan int
 	writeCounter chan int
 }
@@ -109,13 +109,19 @@ func (s *Session) dispatch(data []byte) {
 	}
 
 	pattern, err := reader.ReadByte()
+	if err != nil {
+		s.Close()
+		log.Println(err.Error())
+		return
+	}
+
 	left := len(data) - 2
 
 	switch pattern {
 	case Push:
 		s.onPush(reader, left)
 	case Request:
-		go s.onReq(reader, left)
+		s.onReq(reader, left)
 	case Response:
 		s.onResponse(reader, left)
 	case Ping:
@@ -156,10 +162,8 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	ret := s.handler.OnPush(s, body)
-	if ret != 0 {
-		log.Printf("onPush : %d\n", ret)
-	}
+	// deliver to sta service
+	STA().push <- &push{session: s, body: body}
 }
 
 func (s *Session) onResponse(reader *bytes.Buffer, left int) {
@@ -195,14 +199,13 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	var req chan *Result
-	var exists bool
-	if req, exists = s.requests[serial]; !exists {
-		log.Printf("%d not exist in request.\n", serial)
-		return
+	// deliver to sta service
+	STA().rsp <- &rsp{
+		session: s,
+		serial:  serial,
+		en:      en,
+		body:    body,
 	}
-
-	req <- &Result{En: en, Data: body}
 }
 
 func (s *Session) onReq(reader *bytes.Buffer, left int) {
@@ -234,12 +237,12 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	ch := make(chan *Result, 1)
-	defer close(ch)
-	s.handler.OnReq(s, body, ch)
-	ret := <-ch
-
-	s.response(serial, ret)
+	// deliver to sta service
+	STA().req <- &req{
+		session: s,
+		serial:  serial,
+		body:    body,
+	}
 }
 
 // Write raw send interface
@@ -261,7 +264,7 @@ func (s *Session) Request(data []byte) *Result {
 	}
 
 	s.reqSeed++
-	if _, exists := s.requests[s.reqSeed]; exists {
+	if _, exists := s.reqPool[s.reqSeed]; exists {
 		return &Result{En: SerialConflict}
 	}
 
@@ -269,7 +272,7 @@ func (s *Session) Request(data []byte) *Result {
 	defer close(req)
 
 	// record, let 'response' package know which chan to notify
-	s.requests[s.reqSeed] = req
+	s.reqPool[s.reqSeed] = req
 
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+2+len(data)))
@@ -281,7 +284,7 @@ func (s *Session) Request(data []byte) *Result {
 	}
 
 	ret := <-req
-	delete(s.requests, s.reqSeed)
+	delete(s.reqPool, s.reqSeed)
 
 	return ret
 }

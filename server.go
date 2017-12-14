@@ -48,7 +48,7 @@ func (s *Server) Start() {
 			continue
 		}
 
-		handleConn(s, conn)
+		s.handleConn(conn)
 	}
 }
 
@@ -61,7 +61,7 @@ func (s *Server) Stop() {
 	log.Println("server stopped.")
 }
 
-func handleConn(s *Server, conn net.Conn) {
+func (s *Server) handleConn(conn net.Conn) {
 	s.seed++
 
 	// make session

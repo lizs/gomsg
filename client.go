@@ -10,6 +10,7 @@ type Client struct {
 	node             *Node
 	session          *Session
 	autoRetryEnabled bool
+	sta              *STAService
 }
 
 // NewClient new tcp client
