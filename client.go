@@ -50,12 +50,7 @@ func (c *Client) Start() {
 	go c.node.IOCounter()
 
 	// make session
-	c.session = &Session{
-		ID:           0,
-		conn:         conn,
-		readCounter:  c.node.readCounter,
-		writeCounter: c.node.writeCounter,
-	}
+	c.session = NewSession(0, conn, nil, c.node.readCounter, c.node.writeCounter)
 
 	// notify
 	if c.node.handler != nil {

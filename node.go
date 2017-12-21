@@ -20,6 +20,12 @@ type Node struct {
 
 // IOCounter io couter
 func (n *Node) IOCounter() {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println(e)
+		}
+	}()
+
 	reads := 0
 	writes := 0
 	duration := time.Second * 5

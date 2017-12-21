@@ -5,7 +5,7 @@ import "log"
 type rsp struct {
 	session *Session
 	serial  uint16
-	en      uint16
+	en      int16
 	body    []byte
 }
 
@@ -56,8 +56,13 @@ func STA() *STAService {
 	return sta
 }
 
-// Start start the STA service
-func (s *STAService) Start() {
+func (s *STAService) startImp() {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println(e)
+		}
+	}()
+
 	for {
 		select {
 		case push := <-s.push:
@@ -82,4 +87,9 @@ func (s *STAService) Start() {
 			ret.session.response(ret.serial, ret.ret)
 		}
 	}
+}
+
+// Start start the STA service
+func (s *STAService) Start() {
+	go s.startImp()
 }

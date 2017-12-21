@@ -11,13 +11,18 @@ import (
 // ISessionHandler 会话处理器
 type ISessionHandler interface {
 	OnReq(s *Session, serial uint16, data []byte)
-	OnPush(s *Session, data []byte) uint16
+	OnPush(s *Session, data []byte) int16
 }
 
 // Result (ErrorNum,Data)
 type Result struct {
-	En   uint16
+	En   int16
 	Data []byte
+}
+
+// Succeed if ret is success
+func (ret *Result) Succeed() bool {
+	return ret.En == 0
 }
 
 // Session 会话
@@ -32,6 +37,18 @@ type Session struct {
 	reqPool      map[uint16]chan *Result
 	readCounter  chan int
 	writeCounter chan int
+}
+
+// NewSession make session
+func NewSession(id int32, conn net.Conn, h ISessionHandler, rc chan int, wc chan int) *Session {
+	return &Session{
+		ID:           id,
+		conn:         conn,
+		handler:      h,
+		readCounter:  rc,
+		writeCounter: wc,
+		reqPool:      make(map[uint16]chan *Result),
+	}
 }
 
 // SetHandler 设置会话处理器
@@ -75,6 +92,12 @@ func (s *Session) split(data []byte, atEOF bool) (advance int, token []byte, err
 }
 
 func (s *Session) scan() {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println(e)
+		}
+	}()
+
 	input := bufio.NewScanner(s.conn)
 	input.Split(s.split)
 
@@ -117,7 +140,7 @@ func (s *Session) dispatch(data []byte) {
 
 	left := len(data) - 2
 
-	switch pattern {
+	switch Pattern(pattern) {
 	case Push:
 		s.onPush(reader, left)
 	case Request:
@@ -168,7 +191,7 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 
 func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 	var serial uint16
-	var en uint16
+	var en int16
 	err := binary.Read(reader, binary.LittleEndian, &serial)
 	if err != nil {
 		s.Close()
@@ -269,20 +292,19 @@ func (s *Session) Request(data []byte) *Result {
 	}
 
 	req := make(chan *Result)
-	defer close(req)
-
 	// record, let 'response' package know which chan to notify
 	s.reqPool[s.reqSeed] = req
 
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+2+len(data)))
 	buf.WriteByte(1)
-	buf.WriteByte(Request)
+	buf.WriteByte(byte(Request))
 	binary.Write(buf, binary.LittleEndian, s.reqSeed)
 	if len(data) != 0 {
 		buf.Write(data)
 	}
 
+	s.Write(buf.Bytes())
 	ret := <-req
 	delete(s.reqPool, s.reqSeed)
 
@@ -290,7 +312,7 @@ func (s *Session) Request(data []byte) *Result {
 }
 
 // Push push to remote without response
-func (s *Session) Push(data []byte) uint16 {
+func (s *Session) Push(data []byte) NetError {
 	if len(data) == 0 {
 		return PushDataIsEmpty
 	}
@@ -298,7 +320,7 @@ func (s *Session) Push(data []byte) uint16 {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(data)))
 	buf.WriteByte(1)
-	buf.WriteByte(Push)
+	buf.WriteByte(byte(Push))
 	if len(data) != 0 {
 		buf.Write(data)
 	}
@@ -314,7 +336,7 @@ func (s *Session) Pub(subject string, data []byte) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(subBytes)+1+len(data)))
 	buf.WriteByte(1)
-	buf.WriteByte(Pub)
+	buf.WriteByte(byte(Pub))
 	buf.Write(subBytes)
 	buf.WriteByte(0) // append \0 to string
 	buf.Write(data)
@@ -329,7 +351,7 @@ func (s *Session) Sub(subject string) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+len(subBytes)))
 	buf.WriteByte(1)
-	buf.WriteByte(Sub)
+	buf.WriteByte(byte(Sub))
 	buf.Write(subBytes)
 
 	s.Write(buf.Bytes())
@@ -344,7 +366,7 @@ func (s *Session) pong(serial byte) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+1))
 	buf.WriteByte(1)
-	buf.WriteByte(Pong)
+	buf.WriteByte(byte(Pong))
 	buf.WriteByte(serial)
 
 	s.Write(buf.Bytes())
@@ -354,7 +376,7 @@ func (s *Session) response(serial uint16, ret *Result) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint16(1+1+2+2+len(ret.Data)))
 	buf.WriteByte(1)
-	buf.WriteByte(Response)
+	buf.WriteByte(byte(Response))
 	binary.Write(buf, binary.LittleEndian, serial)
 	binary.Write(buf, binary.LittleEndian, ret.En)
 	if len(ret.Data) != 0 {

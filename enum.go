@@ -1,8 +1,11 @@
 package gomsg
 
+// NetError network error code
+type NetError int16
+
 const (
-	Success = iota
-	ExceptionCatched
+	Success          NetError = 0
+	ExceptionCatched          = iota + -100
 	Write
 	Read
 	RequestDataIsEmpty
@@ -11,16 +14,18 @@ const (
 	ReadErrorNo
 	SessionClosed
 	PushDataIsEmpty
-	End
 )
 
+// Pattern msg pattern
+type Pattern byte
+
 const (
-	Push     = byte(0)
-	Request  = byte(1)
-	Response = byte(2)
-	Ping     = byte(3)
-	Pong     = byte(4)
-	Sub      = byte(5)
-	Unsub    = byte(6)
-	Pub      = byte(7)
+	Push Pattern = iota
+	Request
+	Response
+	Ping
+	Pong
+	Sub
+	Unsub
+	Pub
 )
