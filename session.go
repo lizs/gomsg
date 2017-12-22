@@ -8,12 +8,6 @@ import (
 	"net"
 )
 
-// ISessionHandler 会话处理器
-type ISessionHandler interface {
-	OnReq(s *Session, serial uint16, data []byte)
-	OnPush(s *Session, data []byte) int16
-}
-
 // Result (ErrorNum,Data)
 type Result struct {
 	En   int16
@@ -27,33 +21,26 @@ func (ret *Result) Succeed() bool {
 
 // Session 会话
 type Session struct {
-	ID           int32
-	conn         net.Conn
-	handler      ISessionHandler
-	bodyLen      uint16
-	err          error
-	reqSeed      uint16
-	ppSeed       uint8
-	reqPool      map[uint16]chan *Result
-	readCounter  chan int
-	writeCounter chan int
+	ID   int32
+	conn net.Conn
+	node *Node
+
+	bodyLen uint16
+	err     error
+	reqSeed uint16
+	ppSeed  uint8
+	reqPool map[uint16]chan *Result
+	closed  bool
 }
 
 // NewSession make session
-func NewSession(id int32, conn net.Conn, h ISessionHandler, rc chan int, wc chan int) *Session {
+func NewSession(id int32, conn net.Conn, n *Node) *Session {
 	return &Session{
-		ID:           id,
-		conn:         conn,
-		handler:      h,
-		readCounter:  rc,
-		writeCounter: wc,
-		reqPool:      make(map[uint16]chan *Result),
+		ID:      id,
+		conn:    conn,
+		node:    n,
+		reqPool: make(map[uint16]chan *Result),
 	}
-}
-
-// SetHandler 设置会话处理器
-func (s *Session) SetHandler(handler ISessionHandler) {
-	s.handler = handler
 }
 
 func (s *Session) split(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -104,7 +91,7 @@ func (s *Session) scan() {
 	for input.Scan() {
 		// dispatch
 		s.dispatch(input.Bytes())
-		s.readCounter <- 1
+		s.node.ReadCounter <- 1
 	}
 
 	s.Close()
@@ -112,7 +99,14 @@ func (s *Session) scan() {
 
 // Close 关闭会话
 func (s *Session) Close() {
+	if s.closed {
+		return
+	}
+
 	s.conn.Close()
+	s.node.handler.OnClose(s)
+	s.closed = true
+
 	log.Printf("conn [%d] closed.\n", s.ID)
 }
 
@@ -178,10 +172,6 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 	if n != left || err != nil {
 		s.Close()
 		log.Println("")
-		return
-	}
-
-	if s.handler == nil {
 		return
 	}
 
@@ -255,11 +245,6 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	if s.handler == nil {
-		s.response(serial, &Result{En: NoHandler, Data: nil})
-		return
-	}
-
 	// deliver to sta service
 	STA().req <- &req{
 		session: s,
@@ -274,7 +259,7 @@ func (s *Session) Write(data []byte) {
 	if n != len(data) || err != nil {
 		log.Println("Write error")
 	} else {
-		s.writeCounter <- 1
+		s.node.WriteCounter <- 1
 	}
 
 	//log.Printf("conn : %d=> Write [% x]\n", s.ID, data)

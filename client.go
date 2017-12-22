@@ -3,6 +3,7 @@ package gomsg
 import (
 	"log"
 	"net"
+	"time"
 )
 
 // Client struct
@@ -14,16 +15,11 @@ type Client struct {
 }
 
 // NewClient new tcp client
-func NewClient(host string, h INodeHandler, autoRetry bool) *Client {
+func NewClient(host string, h IHandler, autoRetry bool) *Client {
 	return &Client{
 		autoRetryEnabled: autoRetry,
 		session:          nil,
-		node: &Node{
-			addr:         host,
-			handler:      h,
-			readCounter:  make(chan int),
-			writeCounter: make(chan int),
-		},
+		node:             NewNode(host, h),
 	}
 }
 
@@ -37,9 +33,15 @@ func (c *Client) Start() {
 			log.Printf("connect failed : %v\n", err)
 
 			if c.autoRetryEnabled {
+				select {
+				case <-time.After(time.Second * 2):
+					log.Printf("reconnecting ...")
+				}
+
 				continue
 			}
 
+			log.Println("you can set `autoRetryEnabled` true to do auto reconnect stuff.")
 			return
 		}
 
@@ -50,7 +52,7 @@ func (c *Client) Start() {
 	go c.node.IOCounter()
 
 	// make session
-	c.session = NewSession(0, conn, nil, c.node.readCounter, c.node.writeCounter)
+	c.session = NewSession(0, conn, c.node)
 
 	// notify
 	if c.node.handler != nil {
@@ -67,8 +69,14 @@ func (c *Client) Start() {
 func (c *Client) Stop() {
 	if c.session != nil {
 		c.session.Close()
+
+		if c.node.handler != nil {
+			c.node.handler.OnClose(c.session)
+		}
+
 		c.session = nil
 	}
 
+	c.node.Stop()
 	log.Println("client stopped.")
 }

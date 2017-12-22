@@ -66,7 +66,7 @@ func (s *STAService) startImp() {
 	for {
 		select {
 		case push := <-s.push:
-			ret := push.session.handler.OnPush(push.session, push.body)
+			ret := push.session.node.handler.OnPush(push.session, push.body)
 			if ret != 0 {
 				log.Printf("onPush : %d\n", ret)
 			}
@@ -81,7 +81,7 @@ func (s *STAService) startImp() {
 			req <- &Result{En: rsp.en, Data: rsp.body}
 
 		case req := <-s.req:
-			req.session.handler.OnReq(req.session, req.serial, req.body)
+			req.session.node.handler.OnReq(req.session, req.serial, req.body)
 
 		case ret := <-s.Ret:
 			ret.session.response(ret.serial, ret.ret)

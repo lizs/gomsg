@@ -12,17 +12,36 @@ type Server struct {
 	seed     int32
 }
 
+// OnOpen ...
+func (s *Server) OnOpen(session *Session) {
+	s.sessions[s.seed] = session
+	log.Printf("conn [%d] established.\n", session.ID)
+
+	s.node.handler.OnOpen(session)
+}
+
+// OnClose ...
+func (s *Server) OnClose(session *Session) {
+	delete(s.sessions, session.ID)
+	s.node.handler.OnClose(session)
+}
+
+// OnReq ...
+func (s *Server) OnReq(session *Session, serial uint16, data []byte) {
+	s.node.handler.OnReq(session, serial, data)
+}
+
+// OnPush ...
+func (s *Server) OnPush(session *Session, data []byte) int16 {
+	return s.node.handler.OnPush(session, data)
+}
+
 // NewServer new tcp server
-func NewServer(host string, h INodeHandler) *Server {
+func NewServer(host string, h IHandler) *Server {
 	return &Server{
 		sessions: make(map[int32]*Session),
 		seed:     0,
-		node: &Node{
-			addr:         host,
-			handler:      h,
-			readCounter:  make(chan int),
-			writeCounter: make(chan int),
-		},
+		node:     NewNode(host, h),
 	}
 }
 
@@ -58,6 +77,8 @@ func (s *Server) Stop() {
 		s.Close()
 	}
 
+	s.sessions = make(map[int32]*Session)
+	s.node.Stop()
 	log.Println("server stopped.")
 }
 
@@ -65,13 +86,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	s.seed++
 
 	// make session
-	session := &Session{
-		ID:           s.seed,
-		conn:         conn,
-		readCounter:  s.node.readCounter,
-		writeCounter: s.node.writeCounter,
-	}
-	s.sessions[s.seed] = session
+	session := NewSession(s.seed, conn, s.node)
 
 	// notify
 	if s.node.handler != nil {
@@ -80,6 +95,4 @@ func (s *Server) handleConn(conn net.Conn) {
 
 	// io
 	go session.scan()
-
-	log.Printf("conn [%d] established.\n", session.ID)
 }
