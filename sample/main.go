@@ -11,18 +11,20 @@ type handler struct {
 }
 
 func (h *handler) OnOpen(s *gomsg.Session) {
-	s.SetHandler(h)
+}
+
+func (h *handler) OnClose(s *gomsg.Session) {
 }
 
 func (h *handler) OnReq(s *gomsg.Session, serial uint16, data []byte) {
 	// simulate an async handle
 	time.AfterFunc(time.Second*2, func() {
-		gomsg.STA().Ret <- gomsg.NewRet(s, serial, &gomsg.Result{En: gomsg.Success, Data: nil})
+		gomsg.STA().Ret <- gomsg.NewRet(s, serial, &gomsg.Result{En: int16(gomsg.Success), Data: nil})
 	})
 }
 
-func (h *handler) OnPush(s *gomsg.Session, data []byte) uint16 {
-	return gomsg.Success
+func (h *handler) OnPush(s *gomsg.Session, data []byte) int16 {
+	return int16(gomsg.Success)
 }
 
 func main() {

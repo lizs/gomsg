@@ -89,9 +89,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	session := NewSession(s.seed, conn, s.node)
 
 	// notify
-	if s.node.handler != nil {
-		s.node.handler.OnOpen(session)
-	}
+	s.OnOpen(session)
 
 	// io
 	go session.scan()
