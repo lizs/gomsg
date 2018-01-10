@@ -1,6 +1,8 @@
 package gomsg
 
-import "log"
+import (
+	"log"
+)
 
 type rsp struct {
 	session *Session
@@ -77,7 +79,9 @@ func (s *STAService) startImp() {
 			req <- &Result{En: rsp.en, Data: rsp.body}
 
 		case req := <-s.req:
-			req.session.node.handler.OnReq(req.session, req.serial, req.body)
+			req.session.node.handler.OnReq(req.session, req.body, func(r *Result) {
+				STA().Ret <- NewRet(req.session, req.serial, r)
+			})
 
 		case ret := <-s.Ret:
 			ret.session.response(ret.serial, ret.ret)

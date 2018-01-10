@@ -27,8 +27,8 @@ func (s *Server) OnClose(session *Session) {
 }
 
 // OnReq ...
-func (s *Server) OnReq(session *Session, serial uint16, data []byte) {
-	s.node.handler.OnReq(session, serial, data)
+func (s *Server) OnReq(session *Session, data []byte, cb Callback) {
+	s.node.handler.OnReq(session, data, cb)
 }
 
 // OnPush ...

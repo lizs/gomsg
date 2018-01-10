@@ -5,13 +5,16 @@ import (
 	"time"
 )
 
+// Callback request callback
+type Callback func(*Result)
+
 // IHandler node handler
 type IHandler interface {
-	OnOpen(s *Session)
-	OnClose(s *Session)
+	OnOpen(*Session)
+	OnClose(*Session)
 
-	OnReq(s *Session, serial uint16, data []byte)
-	OnPush(s *Session, data []byte) int16
+	OnReq(*Session, []byte, Callback)
+	OnPush(*Session, []byte) int16
 }
 
 // Node struct

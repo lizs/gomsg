@@ -10,6 +10,7 @@ import (
 var (
 	// Logger logger instance
 	Logger *log.Logger
+	_file  *os.File
 )
 
 func pathExist(path string) (bool, error) {
@@ -25,8 +26,8 @@ func pathExist(path string) (bool, error) {
 	return false, err
 }
 
-// NewLogger create logger
-func NewLogger(name string) {
+// NewLog create logger
+func NewLog(name string) {
 	if len(name) == 0 {
 		log.Fatalln("logger name not specified.")
 	}
@@ -46,12 +47,18 @@ func NewLogger(name string) {
 	}
 
 	fullName := path.Join(logPath, name)
-	file, err := os.Create(fullName)
+	_file, err := os.Create(fullName)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	Logger = log.New(file, "", log.LstdFlags|log.Llongfile)
+	Logger = log.New(_file, "", log.LstdFlags|log.Llongfile)
+	log.Printf("Logger [%s] created", fullName)
+}
+
+// CloseLog close underline log file
+func CloseLog() {
+	_file.Close()
 }
 
 // Recover recover tool function

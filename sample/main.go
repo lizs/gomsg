@@ -16,10 +16,10 @@ func (h *handler) OnOpen(s *gomsg.Session) {
 func (h *handler) OnClose(s *gomsg.Session) {
 }
 
-func (h *handler) OnReq(s *gomsg.Session, serial uint16, data []byte) {
+func (h *handler) OnReq(s *gomsg.Session, data []byte, cb gomsg.Callback) {
 	// simulate an async handle
 	time.AfterFunc(time.Second*2, func() {
-		gomsg.STA().Ret <- gomsg.NewRet(s, serial, &gomsg.Result{En: int16(gomsg.Success), Data: nil})
+		cb(&gomsg.Result{En: int16(gomsg.Success), Data: nil})
 	})
 }
 
@@ -33,9 +33,9 @@ func main() {
 	flag.Parse()
 
 	// create logger
-	loggerName := "gomsg-" + time.Now().Format("2006-01-02_15_04_05_000")
-	gomsg.NewLogger(loggerName)
-	gomsg.Logger.Printf("Logger created in %s", loggerName)
+	loggerName := "gomsg-" + time.Now().Format("2006-01-02_15_04_05")
+	gomsg.NewLog(loggerName)
+	defer gomsg.CloseLog()
 
 	// start STA service
 	gomsg.STA().Start()
