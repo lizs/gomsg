@@ -79,11 +79,7 @@ func (s *Session) split(data []byte, atEOF bool) (advance int, token []byte, err
 }
 
 func (s *Session) scan() {
-	defer func() {
-		if e := recover(); e != nil {
-			log.Println(e)
-		}
-	}()
+	defer Recover()
 
 	input := bufio.NewScanner(s.conn)
 	input.Split(s.split)

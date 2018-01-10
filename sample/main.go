@@ -32,8 +32,13 @@ func main() {
 	runAsServer := flag.Bool("s", false, "whether to run as a tcp server.\n\tUsage : -s true/false")
 	flag.Parse()
 
+	// create logger
+	loggerName := "gomsg-" + time.Now().Format("2006-01-02_15_04_05_000")
+	gomsg.NewLogger(loggerName)
+	gomsg.Logger.Printf("Logger created in %s", loggerName)
+
 	// start STA service
-	go gomsg.STA().Start()
+	gomsg.STA().Start()
 
 	if *runAsServer {
 		s := gomsg.NewServer(*host, &handler{})

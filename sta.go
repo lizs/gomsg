@@ -57,11 +57,7 @@ func STA() *STAService {
 }
 
 func (s *STAService) startImp() {
-	defer func() {
-		if e := recover(); e != nil {
-			log.Println(e)
-		}
-	}()
+	defer Recover()
 
 	for {
 		select {

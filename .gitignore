@@ -1,3 +1,4 @@
 *.exe
 debug
-test/
+test
+log

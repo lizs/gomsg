@@ -41,11 +41,7 @@ func (n *Node) Stop() {
 
 // IOCounter io couter
 func (n *Node) IOCounter() {
-	defer func() {
-		if e := recover(); e != nil {
-			log.Println(e)
-		}
-	}()
+	defer Recover()
 
 	reads := 0
 	writes := 0
