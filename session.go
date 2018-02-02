@@ -90,18 +90,21 @@ func (s *Session) scan() {
 		s.node.ReadCounter <- 1
 	}
 
-	s.Close()
+	s.Close(false)
 }
 
 // Close 关闭会话
-func (s *Session) Close() {
+func (s *Session) Close(force bool) {
 	if s.closed {
 		return
 	}
 
 	s.conn.Close()
-	s.node.handler.OnClose(s)
 	s.closed = true
+
+	if s.node.handler != nil {
+		s.node.handler.OnClose(s, force)
+	}
 
 	log.Printf("conn [%d] closed.\n", s.ID)
 }
@@ -116,14 +119,14 @@ func (s *Session) dispatch(data []byte) {
 	reader := bytes.NewBuffer(data)
 	_, err := reader.ReadByte() // cnt
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
 
 	pattern, err := reader.ReadByte()
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -150,7 +153,7 @@ func (s *Session) dispatch(data []byte) {
 func (s *Session) onPing(reader *bytes.Buffer) {
 	serial, err := reader.ReadByte()
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -166,7 +169,7 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 	body := make([]byte, left)
 	n, err := reader.Read(body)
 	if n != left || err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println("")
 		return
 	}
@@ -180,7 +183,7 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 	var en int16
 	err := binary.Read(reader, binary.LittleEndian, &serial)
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -188,7 +191,7 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 	left -= 2
 	err = binary.Read(reader, binary.LittleEndian, &en)
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -197,13 +200,13 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 	body := make([]byte, left)
 	n, err := reader.Read(body)
 	if n != left {
-		s.Close()
+		s.Close(false)
 		log.Println("")
 		return
 	}
 
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -221,7 +224,7 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 	var serial uint16
 	err := binary.Read(reader, binary.LittleEndian, &serial)
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -230,13 +233,13 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 	body := make([]byte, left)
 	n, err := reader.Read(body)
 	if n != left {
-		s.Close()
+		s.Close(false)
 		log.Println("")
 		return
 	}
 
 	if err != nil {
-		s.Close()
+		s.Close(false)
 		log.Println(err.Error())
 		return
 	}
@@ -286,10 +289,7 @@ func (s *Session) Request(data []byte) *Result {
 	}
 
 	s.Write(buf.Bytes())
-	ret := <-req
-	delete(s.reqPool, s.reqSeed)
-
-	return ret
+	return <-req
 }
 
 // Push push to remote without response

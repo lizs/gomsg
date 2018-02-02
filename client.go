@@ -12,15 +12,41 @@ type Client struct {
 	session          *Session
 	autoRetryEnabled bool
 	sta              *STAService
+	externalHandler  IHandler
+}
+
+func (c *Client) OnOpen(s *Session) {
+	c.externalHandler.OnOpen(s)
+}
+
+func (c *Client) OnClose(s *Session, force bool) {
+	c.externalHandler.OnClose(s, force)
+
+	// reconnect
+	if !force && c.autoRetryEnabled {
+		c.Stop()
+		c.Start()
+	}
+}
+
+func (c *Client) OnReq(s *Session, data []byte, cb Callback) {
+	c.externalHandler.OnReq(s, data, cb)
+}
+
+func (c *Client) OnPush(s *Session, data []byte) int16 {
+	return c.externalHandler.OnPush(s, data)
 }
 
 // NewClient new tcp client
 func NewClient(host string, h IHandler, autoRetry bool) *Client {
-	return &Client{
+	ret := &Client{
 		autoRetryEnabled: autoRetry,
 		session:          nil,
-		node:             NewNode(host, h),
+		externalHandler:  h,
 	}
+
+	ret.node = NewNode(host, ret)
+	return ret
 }
 
 // Start client startup
@@ -68,12 +94,7 @@ func (c *Client) Start() {
 // Stop client shutdown
 func (c *Client) Stop() {
 	if c.session != nil {
-		c.session.Close()
-
-		if c.node.handler != nil {
-			c.node.handler.OnClose(c.session)
-		}
-
+		c.session.Close(true)
 		c.session = nil
 	}
 

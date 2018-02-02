@@ -11,7 +11,7 @@ type Callback func(*Result)
 // IHandler node handler
 type IHandler interface {
 	OnOpen(*Session)
-	OnClose(*Session)
+	OnClose(*Session, bool)
 
 	OnReq(*Session, []byte, Callback)
 	OnPush(*Session, []byte) int16

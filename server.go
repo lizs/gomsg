@@ -21,9 +21,9 @@ func (s *Server) OnOpen(session *Session) {
 }
 
 // OnClose ...
-func (s *Server) OnClose(session *Session) {
+func (s *Server) OnClose(session *Session, force bool) {
 	delete(s.sessions, session.ID)
-	s.node.handler.OnClose(session)
+	s.node.handler.OnClose(session, force)
 }
 
 // OnReq ...
@@ -74,7 +74,7 @@ func (s *Server) Start() {
 // Stop server shutdown
 func (s *Server) Stop() {
 	for _, s := range s.sessions {
-		s.Close()
+		s.Close(true)
 	}
 
 	s.sessions = make(map[int32]*Session)

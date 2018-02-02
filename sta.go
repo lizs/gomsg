@@ -76,6 +76,7 @@ func (s *STAService) startImp() {
 				return
 			}
 
+			delete(rsp.session.reqPool, rsp.serial)
 			req <- &Result{En: rsp.en, Data: rsp.body}
 
 		case req := <-s.req:
