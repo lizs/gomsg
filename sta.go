@@ -51,7 +51,7 @@ func STA() *STAService {
 			rsp:  make(chan *rsp),
 			push: make(chan *push),
 			req:  make(chan *req, 0),
-			Ret:  make(chan *Ret, 0),
+			Ret:  make(chan *Ret, 1),
 		}
 	}
 
@@ -84,7 +84,7 @@ func (s *STAService) startImp() {
 				STA().Ret <- NewRet(req.session, req.serial, r)
 			})
 
-		case ret := <-s.Ret:
+		case ret := <-s.Ret: 
 			ret.session.response(ret.serial, ret.ret)
 		}
 	}
