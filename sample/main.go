@@ -13,7 +13,7 @@ type handler struct {
 func (h *handler) OnOpen(s *gomsg.Session) {
 }
 
-func (h *handler) OnClose(s *gomsg.Session) {
+func (h *handler) OnClose(s *gomsg.Session, force bool) {
 }
 
 func (h *handler) OnReq(s *gomsg.Session, data []byte, cb gomsg.Callback) {

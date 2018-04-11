@@ -83,8 +83,10 @@ func (s *STAService) startImp() {
 			req.session.node.handler.OnReq(req.session, req.body, func(r *Result) {
 				STA().Ret <- NewRet(req.session, req.serial, r)
 			})
+		}
 
-		case ret := <-s.Ret: 
+		select {
+		case ret := <-s.Ret:
 			ret.session.response(ret.serial, ret.ret)
 		}
 	}

@@ -253,15 +253,20 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 }
 
 // Write raw send interface
-func (s *Session) Write(data []byte) {
+func (s *Session) Write(data []byte) error {
 	n, err := s.conn.Write(data)
-	if n != len(data) || err != nil {
-		log.Println("Write error")
+	if n != len(data) {
+		if err != nil {
+			log.Println("Write error =>", err.Error())
+		} else {
+			log.Printf("Write error => writed : %d != expected : %d", n, len(data))
+		}
 	} else {
 		s.node.WriteCounter <- 1
 	}
 
 	//log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
+	return err
 }
 
 // Request request remote to response
@@ -288,7 +293,11 @@ func (s *Session) Request(data []byte) *Result {
 		buf.Write(data)
 	}
 
-	s.Write(buf.Bytes())
+	err := s.Write(buf.Bytes())
+	if err != nil {
+		return &Result{En: Write}
+	}
+
 	return <-req
 }
 
@@ -306,7 +315,11 @@ func (s *Session) Push(data []byte) NetError {
 		buf.Write(data)
 	}
 
-	s.Write(buf.Bytes())
+	err := s.Write(buf.Bytes())
+	if err != nil {
+		return Write
+	}
+
 	return Success
 }
 
