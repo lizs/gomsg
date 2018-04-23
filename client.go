@@ -12,15 +12,14 @@ type Client struct {
 	session          *Session
 	autoRetryEnabled bool
 	sta              *STAService
-	externalHandler  IHandler
 }
 
 func (c *Client) OnOpen(s *Session) {
-	c.externalHandler.OnOpen(s)
+	c.handler.OnOpen(s)
 }
 
 func (c *Client) OnClose(s *Session, force bool) {
-	c.externalHandler.OnClose(s, force)
+	c.handler.OnClose(s, force)
 
 	// reconnect
 	if !force && c.autoRetryEnabled {
@@ -30,11 +29,11 @@ func (c *Client) OnClose(s *Session, force bool) {
 }
 
 func (c *Client) OnReq(s *Session, data []byte, cb Callback) {
-	c.externalHandler.OnReq(s, data, cb)
+	c.handler.OnReq(s, data, cb)
 }
 
 func (c *Client) OnPush(s *Session, data []byte) int16 {
-	return c.externalHandler.OnPush(s, data)
+	return c.handler.OnPush(s, data)
 }
 
 // keep alive
@@ -47,9 +46,8 @@ func NewClient(host string, h IHandler, autoRetry bool) *Client {
 	ret := &Client{
 		autoRetryEnabled: autoRetry,
 		session:          nil,
-		externalHandler:  h,
 	}
-	ret.Node = newNode(host, &ret.Node, 1)
+	ret.Node = newNode(host, h, 1)
 
 	return ret
 }
@@ -86,7 +84,7 @@ func (c *Client) Start() {
 	c.session = newSession(0, conn, &c.Node)
 
 	// notify
-	c.Node.OnOpen(c.session)
+	c.OnOpen(c.session)
 
 	// io
 	go c.session.scan()
