@@ -8,7 +8,7 @@ import (
 
 // Client struct
 type Client struct {
-	node             *Node
+	Node
 	session          *Session
 	autoRetryEnabled bool
 	sta              *STAService
@@ -37,6 +37,11 @@ func (c *Client) OnPush(s *Session, data []byte) int16 {
 	return c.externalHandler.OnPush(s, data)
 }
 
+// keep alive
+func (c *Client) keepAlive() {
+	c.session.Ping()
+}
+
 // NewClient new tcp client
 func NewClient(host string, h IHandler, autoRetry bool) *Client {
 	ret := &Client{
@@ -44,8 +49,8 @@ func NewClient(host string, h IHandler, autoRetry bool) *Client {
 		session:          nil,
 		externalHandler:  h,
 	}
+	ret.Node = newNode(host, &ret.Node, 1)
 
-	ret.node = NewNode(host, ret)
 	return ret
 }
 
@@ -54,7 +59,7 @@ func (c *Client) Start() {
 	var conn net.Conn
 	var err error
 	for {
-		conn, err = net.Dial("tcp4", c.node.addr)
+		conn, err = net.Dial("tcp4", c.Node.addr)
 		if err != nil {
 			log.Printf("connect failed : %v\n", err)
 
@@ -75,15 +80,13 @@ func (c *Client) Start() {
 	}
 
 	// io counter
-	go c.node.IOCounter()
+	go c.ioCounter()
 
 	// make session
-	c.session = NewSession(0, conn, c.node)
+	c.session = newSession(0, conn, &c.Node)
 
 	// notify
-	if c.node.handler != nil {
-		c.node.handler.OnOpen(c.session)
-	}
+	c.Node.OnOpen(c.session)
 
 	// io
 	go c.session.scan()
@@ -98,6 +101,6 @@ func (c *Client) Stop() {
 		c.session = nil
 	}
 
-	c.node.Stop()
+	c.Node.Stop()
 	log.Println("client stopped.")
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
+	"time"
 )
 
 // Result (ErrorNum,Data)
@@ -25,21 +26,23 @@ type Session struct {
 	conn net.Conn
 	node *Node
 
-	bodyLen uint16
-	err     error
-	reqSeed uint16
-	ppSeed  uint8
-	reqPool map[uint16]chan *Result
-	closed  bool
+	bodyLen      uint16
+	err          error
+	reqSeed      uint16
+	ppSeed       uint8
+	reqPool      map[uint16]chan *Result
+	closed       bool
+	responseTime int64
 }
 
 // NewSession make session
-func NewSession(id int32, conn net.Conn, n *Node) *Session {
+func newSession(id int32, conn net.Conn, n *Node) *Session {
 	return &Session{
-		ID:      id,
-		conn:    conn,
-		node:    n,
-		reqPool: make(map[uint16]chan *Result),
+		ID:           id,
+		conn:         conn,
+		node:         n,
+		reqPool:      make(map[uint16]chan *Result),
+		responseTime: time.Now().Unix(),
 	}
 }
 
@@ -102,15 +105,18 @@ func (s *Session) Close(force bool) {
 	s.conn.Close()
 	s.closed = true
 
-	if s.node.handler != nil {
-		s.node.handler.OnClose(s, force)
-	}
+	s.node.OnClose(s, force)
 
 	log.Printf("conn [%d] closed.\n", s.ID)
 }
 
+func (s *Session) elapsedSinceLastResponse() int {
+	return int(time.Now().Unix() - s.responseTime)
+}
+
 func (s *Session) dispatch(data []byte) {
 	//log.Printf("conn : %d=> Read [% x]\n", s.ID, data)
+	s.responseTime = time.Now().Unix()
 
 	if len(data) < 2 {
 		return
@@ -352,8 +358,14 @@ func (s *Session) Sub(subject string) {
 }
 
 // Ping ping remote, returns delay seconds
-func (s *Session) Ping() uint32 {
-	return 0
+func (s *Session) Ping() {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, uint16(1+1+1))
+	buf.WriteByte(1)
+	buf.WriteByte(byte(Ping))
+	buf.WriteByte(0)
+
+	s.Write(buf.Bytes())
 }
 
 func (s *Session) pong(serial byte) {

@@ -7,7 +7,7 @@ import (
 
 // Server struct
 type Server struct {
-	node     *Node
+	Node
 	sessions map[int32]*Session
 	seed     int32
 }
@@ -17,23 +17,23 @@ func (s *Server) OnOpen(session *Session) {
 	s.sessions[s.seed] = session
 	log.Printf("conn [%d] established.\n", session.ID)
 
-	s.node.handler.OnOpen(session)
+	s.handler.OnOpen(session)
 }
 
 // OnClose ...
 func (s *Server) OnClose(session *Session, force bool) {
 	delete(s.sessions, session.ID)
-	s.node.handler.OnClose(session, force)
+	s.handler.OnClose(session, force)
 }
 
 // OnReq ...
 func (s *Server) OnReq(session *Session, data []byte, cb Callback) {
-	s.node.handler.OnReq(session, data, cb)
+	s.handler.OnReq(session, data, cb)
 }
 
 // OnPush ...
 func (s *Server) OnPush(session *Session, data []byte) int16 {
-	return s.node.handler.OnPush(session, data)
+	return s.handler.OnPush(session, data)
 }
 
 // NewServer new tcp server
@@ -41,23 +41,32 @@ func NewServer(host string, h IHandler) *Server {
 	return &Server{
 		sessions: make(map[int32]*Session),
 		seed:     0,
-		node:     NewNode(host, h),
+		Node:     newNode(host, h, 2),
+	}
+}
+
+// keep alive
+func (s *Server) keepAlive() {
+	for _, session := range s.sessions {
+		if session.elapsedSinceLastResponse() > 4 {
+			session.Close(true)
+		}
 	}
 }
 
 // Start server startup
 func (s *Server) Start() {
-	listener, err := net.Listen("tcp4", s.node.addr)
+	listener, err := net.Listen("tcp4", s.addr)
 	if err != nil {
 		log.Panicf("listen failed : %v", err)
 	} else {
-		log.Printf("server running on [%s]\n", s.node.addr)
+		log.Printf("server running on [%s]\n", s.addr)
 	}
 
 	defer listener.Close()
 
 	// io counter
-	go s.node.IOCounter()
+	go s.ioCounter()
 
 	// accept incomming connections
 	for {
@@ -78,7 +87,7 @@ func (s *Server) Stop() {
 	}
 
 	s.sessions = make(map[int32]*Session)
-	s.node.Stop()
+	s.Node.Stop()
 	log.Println("server stopped.")
 }
 
@@ -86,7 +95,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	s.seed++
 
 	// make session
-	session := NewSession(s.seed, conn, s.node)
+	session := newSession(s.seed, conn, &s.Node)
 
 	// notify
 	s.OnOpen(session)
