@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"runtime/debug"
 	"strings"
 )
 
@@ -64,9 +65,9 @@ func CloseLog() {
 // Recover recover tool function
 func Recover() {
 	if e := recover(); e != nil {
-		log.Println(e)
+		log.Println(debug.Stack())
 		if Logger != nil {
-			Logger.Println(e)
+			Logger.Println(debug.Stack())
 		}
 	}
 }

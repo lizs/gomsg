@@ -51,7 +51,7 @@ func STA() *STAService {
 			rsp:  make(chan *rsp),
 			push: make(chan *push),
 			req:  make(chan *req, 0),
-			Ret:  make(chan *Ret, 1),
+			Ret:  make(chan *Ret, 10000),
 		}
 	}
 
@@ -63,6 +63,9 @@ func (s *STAService) startImp() {
 
 	for {
 		select {
+		case ret := <-s.Ret:
+			ret.session.response(ret.serial, ret.ret)
+
 		case push := <-s.push:
 			ret := push.session.node.handler.OnPush(push.session, push.body)
 			if ret != 0 {
@@ -83,11 +86,6 @@ func (s *STAService) startImp() {
 			req.session.node.handler.OnReq(req.session, req.body, func(r *Result) {
 				STA().Ret <- NewRet(req.session, req.serial, r)
 			})
-		}
-
-		select {
-		case ret := <-s.Ret:
-			ret.session.response(ret.serial, ret.ret)
 		}
 	}
 }
