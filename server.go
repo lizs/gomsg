@@ -41,14 +41,16 @@ func NewServer(host string, h IHandler) *Server {
 	return &Server{
 		sessions: make(map[int32]*Session),
 		seed:     0,
-		Node:     newNode(host, h, 2),
+		Node:     newNode(host, h, 20),
 	}
 }
 
 // keep alive
 func (s *Server) keepAlive() {
 	for _, session := range s.sessions {
-		if session.elapsedSinceLastResponse() > 4 {
+		if session.elapsedSinceLastResponse() > 40 {
+			session.Ping()
+		} else if session.elapsedSinceLastResponse() > 60 {
 			session.Close(true)
 		}
 	}

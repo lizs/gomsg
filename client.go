@@ -38,7 +38,11 @@ func (c *Client) OnPush(s *Session, data []byte) int16 {
 
 // keep alive
 func (c *Client) keepAlive() {
-	c.session.Ping()
+	if c.session.elapsedSinceLastResponse() > 60 {
+		c.session.Close(false)
+	} else if c.session.elapsedSinceLastResponse() > 20 {
+		c.session.Ping()
+	}
 }
 
 // NewClient new tcp client
@@ -47,7 +51,7 @@ func NewClient(host string, h IHandler, autoRetry bool) *Client {
 		autoRetryEnabled: autoRetry,
 		session:          nil,
 	}
-	ret.Node = newNode(host, h, 1)
+	ret.Node = newNode(host, h, 10)
 
 	return ret
 }

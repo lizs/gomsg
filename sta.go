@@ -50,7 +50,7 @@ func STA() *STAService {
 		sta = &STAService{
 			rsp:  make(chan *rsp),
 			push: make(chan *push),
-			req:  make(chan *req, 0),
+			req:  make(chan *req, 1000),
 			Ret:  make(chan *Ret, 10000),
 		}
 	}
