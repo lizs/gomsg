@@ -67,7 +67,7 @@ func (s *STAService) startImp() {
 			ret.session.response(ret.serial, ret.ret)
 
 		case push := <-s.push:
-			ret := push.session.node.OnPush(push.session, push.body)
+			ret := push.session.node.internalHandler.OnPush(push.session, push.body)
 			if ret != 0 {
 				log.Printf("onPush : %d\n", ret)
 			}
@@ -83,7 +83,7 @@ func (s *STAService) startImp() {
 			req <- &Result{En: rsp.en, Data: rsp.body}
 
 		case req := <-s.req:
-			req.session.node.OnReq(req.session, req.body, func(r *Result) {
+			req.session.node.internalHandler.OnReq(req.session, req.body, func(r *Result) {
 				STA().Ret <- NewRet(req.session, req.serial, r)
 			})
 		}

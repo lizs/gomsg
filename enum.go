@@ -4,8 +4,8 @@ package gomsg
 type NetError int16
 
 const (
-	Success          NetError = 0
-	ExceptionCatched          = iota + -100
+	Success NetError = iota
+	ExceptionCatched
 	Write
 	Read
 	RequestDataIsEmpty

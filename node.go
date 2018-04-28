@@ -9,7 +9,7 @@ import (
 type Callback func(*Result)
 
 // internal with keep alive handling
-type iInternalHandler interface {
+type iinternal interface {
 	IHandler
 	keepAlive()
 }
@@ -24,54 +24,47 @@ type IHandler interface {
 
 // Node struct
 type Node struct {
-	addr              string
-	handler           IHandler
-	signal            chan int
-	ReadCounter       chan int
-	WriteCounter      chan int
-	keepAliveInterval int
+	addr            string
+	internalHandler iinternal
+	signal          chan int
+	keepAliveSignal chan int
+	ReadCounter     chan int
+	WriteCounter    chan int
 }
 
 // NewNode make node ptr
-func newNode(addr string, h IHandler, keepAliveInterval int) Node {
+func newNode(addr string, h iinternal) Node {
 	return Node{
-		addr:              addr,
-		handler:           h,
-		ReadCounter:       make(chan int),
-		WriteCounter:      make(chan int),
-		signal:            make(chan int),
-		keepAliveInterval: keepAliveInterval,
+		addr:            addr,
+		internalHandler: h,
+		ReadCounter:     make(chan int),
+		WriteCounter:    make(chan int),
+		signal:          make(chan int),
+		keepAliveSignal: make(chan int, 1),
 	}
-}
-
-func (n *Node) keepAlive() {}
-
-func (n *Node) OnOpen(*Session) {}
-
-func (n *Node) OnClose(*Session, bool) {}
-
-func (n *Node) OnReq(*Session, []byte, Callback) {}
-
-func (n *Node) OnPush(*Session, []byte) int16 {
-	return 0
 }
 
 // Stop stop the IOCounter service
 func (n *Node) Stop() {
 	n.signal <- 1
+	n.keepAliveSignal <- 1
+}
+
+// Start
+func (n *Node) Start() {
+	go n.ioCounter()
+	go n.internalHandler.keepAlive()
 }
 
 // IOCounter io couter
 func (n *Node) ioCounter() {
 	defer Recover()
 
+	log.Println("IOCounter running.")
 	reads := 0
 	writes := 0
-	d1 := time.Second * 5
-	t1 := time.NewTimer(d1)
-
-	d2 := time.Duration(n.keepAliveInterval) * time.Second
-	t2 := time.NewTimer(d2)
+	d := time.Second * 5
+	t := time.NewTimer(d)
 
 	stop := false
 	for !stop {
@@ -82,14 +75,10 @@ func (n *Node) ioCounter() {
 		case m := <-n.WriteCounter:
 			writes += m
 
-		case <-t1.C:
-			t1.Reset(d1)
+		case <-t.C:
+			t.Reset(d)
 			log.Printf("Read : %d/s\tWrite : %d/s\n", reads/5, writes/5)
 			reads, writes = 0, 0
-
-		case <-t2.C:
-			t2.Reset(d2)
-			n.keepAlive()
 
 		case <-n.signal:
 			stop = true

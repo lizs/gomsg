@@ -12,9 +12,11 @@ type Client struct {
 	session          *Session
 	autoRetryEnabled bool
 	sta              *STAService
+	handler          IHandler
 }
 
 func (c *Client) OnOpen(s *Session) {
+	c.session.responseTime = time.Now().Unix()
 	c.handler.OnOpen(s)
 }
 
@@ -23,6 +25,7 @@ func (c *Client) OnClose(s *Session, force bool) {
 
 	// reconnect
 	if !force && c.autoRetryEnabled {
+		log.Println("reconnecting ...")
 		c.Stop()
 		c.Start()
 	}
@@ -38,11 +41,30 @@ func (c *Client) OnPush(s *Session, data []byte) int16 {
 
 // keep alive
 func (c *Client) keepAlive() {
-	if c.session.elapsedSinceLastResponse() > 60 {
-		c.session.Close(false)
-	} else if c.session.elapsedSinceLastResponse() > 20 {
-		c.session.Ping()
+	defer Recover()
+
+	log.Println("Keep alive running.")
+
+	d := time.Second * 5
+	t := time.NewTimer(d)
+
+	stop := false
+	for !stop {
+		select {
+		case <-t.C:
+			t.Reset(d)
+			if c.session.elapsedSinceLastResponse() > 30 {
+				c.session.Close(false)
+			} else if c.session.elapsedSinceLastResponse() > 10 {
+				c.session.Ping()
+			}
+
+		case <-c.keepAliveSignal:
+			stop = true
+		}
 	}
+
+	log.Println("Keep alive stopped.")
 }
 
 // NewClient new tcp client
@@ -50,8 +72,9 @@ func NewClient(host string, h IHandler, autoRetry bool) *Client {
 	ret := &Client{
 		autoRetryEnabled: autoRetry,
 		session:          nil,
+		handler:          h,
 	}
-	ret.Node = newNode(host, h, 10)
+	ret.Node = newNode(host, ret)
 
 	return ret
 }
@@ -81,8 +104,8 @@ func (c *Client) Start() {
 		break
 	}
 
-	// io counter
-	go c.ioCounter()
+	// base start
+	c.Node.Start()
 
 	// make session
 	c.session = newSession(0, conn, &c.Node)
@@ -98,11 +121,12 @@ func (c *Client) Start() {
 
 // Stop client shutdown
 func (c *Client) Stop() {
+	c.Node.Stop()
+
 	if c.session != nil {
 		c.session.Close(true)
 		c.session = nil
 	}
 
-	c.Node.Stop()
 	log.Println("client stopped.")
 }

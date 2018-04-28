@@ -65,9 +65,9 @@ func CloseLog() {
 // Recover recover tool function
 func Recover() {
 	if e := recover(); e != nil {
-		log.Println(debug.Stack())
+		log.Printf("%s=>%s\n", e, debug.Stack())
 		if Logger != nil {
-			Logger.Println(debug.Stack())
+			Logger.Printf("%s=>%s\n", e, debug.Stack())
 		}
 	}
 }

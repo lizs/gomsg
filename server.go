@@ -3,6 +3,7 @@ package gomsg
 import (
 	"log"
 	"net"
+	"time"
 )
 
 // Server struct
@@ -10,6 +11,7 @@ type Server struct {
 	Node
 	sessions map[int32]*Session
 	seed     int32
+	handler  IHandler
 }
 
 // OnOpen ...
@@ -38,22 +40,41 @@ func (s *Server) OnPush(session *Session, data []byte) int16 {
 
 // NewServer new tcp server
 func NewServer(host string, h IHandler) *Server {
-	return &Server{
+	ret := &Server{
 		sessions: make(map[int32]*Session),
 		seed:     0,
-		Node:     newNode(host, h, 20),
+		handler:  h,
 	}
+
+	ret.Node = newNode(host, ret)
+	return ret
 }
 
 // keep alive
 func (s *Server) keepAlive() {
-	for _, session := range s.sessions {
-		if session.elapsedSinceLastResponse() > 40 {
-			session.Ping()
-		} else if session.elapsedSinceLastResponse() > 60 {
-			session.Close(true)
+	defer Recover()
+	d := time.Second * 5
+	t := time.NewTimer(d)
+
+	stop := false
+	for !stop {
+		select {
+		case <-t.C:
+			t.Reset(d)
+			for _, session := range s.sessions {
+				if session.elapsedSinceLastResponse() > 40 {
+					session.Ping()
+				} else if session.elapsedSinceLastResponse() > 60 {
+					session.Close(true)
+				}
+			}
+
+		case <-s.keepAliveSignal:
+			stop = true
 		}
 	}
+
+	log.Println("Keep alive stopped.")
 }
 
 // Start server startup
@@ -89,6 +110,7 @@ func (s *Server) Stop() {
 	}
 
 	s.sessions = make(map[int32]*Session)
+	s.keepAliveSignal <- 1
 	s.Node.Stop()
 	log.Println("server stopped.")
 }

@@ -90,6 +90,7 @@ func (s *Session) scan() {
 	for input.Scan() {
 		// dispatch
 		s.dispatch(input.Bytes())
+
 		s.node.ReadCounter <- 1
 	}
 
@@ -105,7 +106,7 @@ func (s *Session) Close(force bool) {
 	s.conn.Close()
 	s.closed = true
 
-	s.node.OnClose(s, force)
+	s.node.internalHandler.OnClose(s, force)
 
 	log.Printf("conn [%d] closed.\n", s.ID)
 }
@@ -278,12 +279,12 @@ func (s *Session) Write(data []byte) error {
 // Request request remote to response
 func (s *Session) Request(data []byte) *Result {
 	if len(data) == 0 {
-		return &Result{En: RequestDataIsEmpty}
+		return &Result{En: int16(RequestDataIsEmpty)}
 	}
 
 	s.reqSeed++
 	if _, exists := s.reqPool[s.reqSeed]; exists {
-		return &Result{En: SerialConflict}
+		return &Result{En: int16(SerialConflict)}
 	}
 
 	req := make(chan *Result)
@@ -301,7 +302,7 @@ func (s *Session) Request(data []byte) *Result {
 
 	err := s.Write(buf.Bytes())
 	if err != nil {
-		return &Result{En: Write}
+		return &Result{En: int16(Write)}
 	}
 
 	return <-req
