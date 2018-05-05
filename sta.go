@@ -48,9 +48,9 @@ var sta *STAService
 func STA() *STAService {
 	if sta == nil {
 		sta = &STAService{
-			rsp:  make(chan *rsp),
-			push: make(chan *push),
-			req:  make(chan *req, 1000),
+			rsp:  make(chan *rsp, 10000),
+			push: make(chan *push, 10000),
+			req:  make(chan *req, 10000),
 			Ret:  make(chan *Ret, 10000),
 		}
 	}

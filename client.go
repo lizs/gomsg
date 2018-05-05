@@ -54,6 +54,7 @@ func (c *Client) keepAlive() {
 		case <-t.C:
 			t.Reset(d)
 			if c.session.elapsedSinceLastResponse() > 30 {
+				log.Println("session not reponse over 30s, closing...")
 				c.session.Close(false)
 			} else if c.session.elapsedSinceLastResponse() > 10 {
 				c.session.Ping()
