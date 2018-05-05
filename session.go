@@ -182,7 +182,12 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 	}
 
 	// deliver to sta service
-	STA().push <- &push{session: s, body: body}
+	// STA().push <- &push{session: s, body: body}
+
+	ret := s.node.internalHandler.OnPush(s, body)
+	if ret != 0 {
+		log.Printf("onPush : %d\n", ret)
+	}
 }
 
 func (s *Session) onResponse(reader *bytes.Buffer, left int) {
@@ -219,12 +224,21 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 	}
 
 	// deliver to sta service
-	STA().rsp <- &rsp{
-		session: s,
-		serial:  serial,
-		en:      en,
-		body:    body,
+	// STA().rsp <- &rsp{
+	// 	session: s,
+	// 	serial:  serial,
+	// 	en:      en,
+	// 	body:    body,
+	// }
+
+	req, exists := s.reqPool[serial]
+	if !exists {
+		log.Printf("%d not exist in req pool.\n", serial)
+		return
 	}
+
+	delete(s.reqPool, serial)
+	req <- &Result{En: en, Data: body}
 }
 
 func (s *Session) onReq(reader *bytes.Buffer, left int) {
@@ -252,11 +266,15 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 	}
 
 	// deliver to sta service
-	STA().req <- &req{
-		session: s,
-		serial:  serial,
-		body:    body,
-	}
+	// STA().req <- &req{
+	// 	session: s,
+	// 	serial:  serial,
+	// 	body:    body,
+	// }
+
+	s.node.internalHandler.OnReq(s, body, func(r *Result) {				
+		s.response(serial, r)
+	})
 }
 
 // Write raw send interface

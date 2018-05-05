@@ -37,9 +37,9 @@ func NewRet(s *Session, serial uint16, ret *Result) *Ret {
 // STAService sta service
 type STAService struct {
 	rsp  chan *rsp
-	push chan *push
-	req  chan *req
-	Ret  chan *Ret
+	// push chan *push
+	// req  chan *req
+	// Ret  chan *Ret
 }
 
 var sta *STAService
@@ -49,9 +49,9 @@ func STA() *STAService {
 	if sta == nil {
 		sta = &STAService{
 			rsp:  make(chan *rsp, 10000),
-			push: make(chan *push, 10000),
-			req:  make(chan *req, 10000),
-			Ret:  make(chan *Ret, 10000),
+			// push: make(chan *push, 10000),
+			// req:  make(chan *req, 10000),
+			// Ret:  make(chan *Ret, 10000),
 		}
 	}
 
@@ -63,14 +63,14 @@ func (s *STAService) startImp() {
 
 	for {
 		select {
-		case ret := <-s.Ret:
-			ret.session.response(ret.serial, ret.ret)
+		// case ret := <-s.Ret:
+		// 	ret.session.response(ret.serial, ret.ret)
 
-		case push := <-s.push:
-			ret := push.session.node.internalHandler.OnPush(push.session, push.body)
-			if ret != 0 {
-				log.Printf("onPush : %d\n", ret)
-			}
+		// case push := <-s.push:
+		// 	ret := push.session.node.internalHandler.OnPush(push.session, push.body)
+		// 	if ret != 0 {
+		// 		log.Printf("onPush : %d\n", ret)
+		// 	}
 
 		case rsp := <-s.rsp:
 			req, exists := rsp.session.reqPool[rsp.serial]
@@ -82,10 +82,10 @@ func (s *STAService) startImp() {
 			delete(rsp.session.reqPool, rsp.serial)
 			req <- &Result{En: rsp.en, Data: rsp.body}
 
-		case req := <-s.req:
-			req.session.node.internalHandler.OnReq(req.session, req.body, func(r *Result) {
-				STA().Ret <- NewRet(req.session, req.serial, r)
-			})
+		// case req := <-s.req:
+		// 	req.session.node.internalHandler.OnReq(req.session, req.body, func(r *Result) {
+		// 		STA().Ret <- NewRet(req.session, req.serial, r)
+		// 	})
 		}
 	}
 }
