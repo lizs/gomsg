@@ -181,9 +181,6 @@ func (s *Session) onPush(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	// deliver to sta service
-	// STA().push <- &push{session: s, body: body}
-
 	ret := s.node.internalHandler.OnPush(s, body)
 	if ret != 0 {
 		log.Printf("onPush : %d\n", ret)
@@ -223,14 +220,6 @@ func (s *Session) onResponse(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	// deliver to sta service
-	// STA().rsp <- &rsp{
-	// 	session: s,
-	// 	serial:  serial,
-	// 	en:      en,
-	// 	body:    body,
-	// }
-
 	req, exists := s.reqPool[serial]
 	if !exists {
 		log.Printf("%d not exist in req pool.\n", serial)
@@ -265,14 +254,7 @@ func (s *Session) onReq(reader *bytes.Buffer, left int) {
 		return
 	}
 
-	// deliver to sta service
-	// STA().req <- &req{
-	// 	session: s,
-	// 	serial:  serial,
-	// 	body:    body,
-	// }
-
-	s.node.internalHandler.OnReq(s, body, func(r *Result) {				
+	go s.node.internalHandler.OnReq(s, body, func(r *Result) {
 		s.response(serial, r)
 	})
 }
@@ -283,6 +265,7 @@ func (s *Session) Write(data []byte) error {
 	if n != len(data) {
 		if err != nil {
 			log.Println("Write error =>", err.Error())
+			s.Close(false)
 		} else {
 			log.Printf("Write error => writed : %d != expected : %d", n, len(data))
 		}
@@ -290,7 +273,6 @@ func (s *Session) Write(data []byte) error {
 		s.node.WriteCounter <- 1
 	}
 
-	//log.Printf("conn : %d=> Write [% x]\n", s.ID, data)
 	return err
 }
 
