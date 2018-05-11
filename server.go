@@ -30,6 +30,8 @@ func (s *Server) OnClose(session *Session, force bool) {
 
 // OnReq ...
 func (s *Server) OnReq(session *Session, data []byte, cb Callback) {
+	defer Recover()
+
 	s.handler.OnReq(session, data, cb)
 }
 
@@ -53,6 +55,7 @@ func NewServer(host string, h IHandler) *Server {
 // keep alive
 func (s *Server) keepAlive() {
 	defer Recover()
+
 	d := time.Second * 5
 	t := time.NewTimer(d)
 
