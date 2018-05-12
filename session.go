@@ -103,12 +103,11 @@ func (s *Session) Close(force bool) {
 		return
 	}
 
-	s.conn.Close()
 	s.closed = true
-
-	s.node.internalHandler.OnClose(s, force)
+	s.conn.Close()
 
 	log.Printf("conn [%d] closed.\n", s.ID)
+	s.node.internalHandler.OnClose(s, force)
 }
 
 func (s *Session) elapsedSinceLastResponse() int {
