@@ -91,8 +91,8 @@ func (s *Server) Start() {
 
 	defer listener.Close()
 
-	// io counter
-	go s.ioCounter()
+	// base.start
+	s.Node.Start()
 
 	// accept incomming connections
 	for {
