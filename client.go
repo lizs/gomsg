@@ -11,8 +11,8 @@ type Client struct {
 	Node
 	session          *Session
 	autoRetryEnabled bool
-	sta              *STAService
-	handler          IHandler
+	//sta              *STAService
+	handler IHandler
 }
 
 func (c *Client) OnOpen(s *Session) {
