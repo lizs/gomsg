@@ -110,6 +110,11 @@ func (s *Session) Close(force bool) {
 	s.node.internalHandler.OnClose(s, force)
 }
 
+// IsClosed 是否关闭
+func (s *Session) Closed() bool {
+	return s == nil || s.closed
+}
+
 func (s *Session) elapsedSinceLastResponse() int {
 	return int(time.Now().Unix() - s.responseTime)
 }
