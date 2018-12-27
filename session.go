@@ -107,7 +107,7 @@ func (s *Session) Close(force bool) {
 	s.conn.Close()
 
 	log.Printf("conn [%d] closed.\n", s.ID)
-	s.node.internalHandler.OnClose(s, force)
+	go s.node.internalHandler.OnClose(s, force)
 }
 
 // IsClosed 是否关闭
