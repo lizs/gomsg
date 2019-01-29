@@ -14,6 +14,15 @@ type Server struct {
 	handler  IHandler
 }
 
+// Count return sessions'count
+func (s *Server) Count() int {
+	if s.sessions != nil {
+		return len(s.sessions)
+	}
+
+	return 0
+}
+
 // OnOpen ...
 func (s *Server) OnOpen(session *Session) {
 	s.sessions[s.seed] = session

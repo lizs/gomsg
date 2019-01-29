@@ -120,7 +120,7 @@ func (s *Session) elapsedSinceLastResponse() int {
 }
 
 func (s *Session) dispatch(data []byte) {
-	//log.Printf("conn : %d=> Read [% x]\n", s.ID, data)
+	// log.Printf("conn : %d=> Read [% x]\n", s.ID, data)
 	s.responseTime = time.Now().Unix()
 
 	if len(data) < 2 {
